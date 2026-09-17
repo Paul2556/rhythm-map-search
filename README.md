@@ -1,20 +1,17 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+A search UI over a small shared library (`lib/rhythm`) that queries the osu! and Quaver public APIs for 4-key (4K) mania mapsets and merges the results.
 
 ## Getting Started
 
-First, run the development server:
+Copy `.env.example` to `.env.local` and fill in an osu! OAuth client id/secret (create one at https://osu.ppy.sh/home/account/edit#oauth, any redirect URL works since only the `client_credentials` grant is used). Quaver's search endpoint is public and needs no credentials.
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+nub install
+nub run dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+
+Without osu! credentials configured, the osu! side of the search will show an error but Quaver results still work.
 
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
