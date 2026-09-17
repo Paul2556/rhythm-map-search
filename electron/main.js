@@ -1,7 +1,12 @@
 const { app, BrowserWindow, screen, ipcMain, Menu } = require("electron");
 const path = require("path");
+const net = require("net");
+const http = require("http");
+const { fork } = require("child_process");
 
 const DEV_URL = process.env.ELECTRON_APP_URL || "http://localhost:3001";
+let appUrl = DEV_URL;
+let serverProcess = null;
 
 const ICON_SIZE = 56;
 const ICON_MARGIN = 16;
@@ -50,6 +55,61 @@ function getFullBounds() {
   };
 }
 
+function getFreePort() {
+  return new Promise((resolve, reject) => {
+    const srv = net.createServer();
+    srv.on("error", reject);
+    srv.listen(0, "127.0.0.1", () => {
+      const { port } = srv.address();
+      srv.close(() => resolve(port));
+    });
+  });
+}
+
+function waitForServer(url, timeoutMs = 20_000) {
+  const start = Date.now();
+  return new Promise((resolve, reject) => {
+    (function poll() {
+      http
+        .get(url, (res) => {
+          res.resume();
+          resolve();
+        })
+        .on("error", () => {
+          if (Date.now() - start > timeoutMs) reject(new Error("Bundled server did not start in time"));
+          else setTimeout(poll, 200);
+        });
+    })();
+  });
+}
+
+// The production build (packaged app) has no `next dev` server to point at —
+// it bundles a standalone Next.js server (see scripts/prepare-standalone.mjs)
+// and runs it via Electron's embedded Node (ELECTRON_RUN_AS_NODE) on a free
+// local port instead.
+async function startProductionServer() {
+  const port = await getFreePort();
+  const serverPath = path.join(process.resourcesPath, "standalone", "server", "server.js");
+
+  serverProcess = fork(serverPath, [], {
+    env: {
+      ...process.env,
+      PORT: String(port),
+      HOSTNAME: "127.0.0.1",
+      NODE_ENV: "production",
+      RHYTHM_MAP_SEARCH_DATA_DIR: app.getPath("userData"),
+      ELECTRON_RUN_AS_NODE: "1",
+    },
+    stdio: "pipe",
+  });
+  serverProcess.stdout?.on("data", (d) => console.log(`[server] ${d}`.trim()));
+  serverProcess.stderr?.on("data", (d) => console.error(`[server] ${d}`.trim()));
+
+  const url = `http://127.0.0.1:${port}`;
+  await waitForServer(url);
+  return url;
+}
+
 function setAppMenu() {
   // Frameless windows still need a real app menu on macOS — it's what wires Cmd+C/Cmd+V/etc.
   // to text inputs even though there's no visible menu bar on the window itself.
@@ -94,7 +154,7 @@ function createWindow() {
   win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
 
   win.webContents.session.clearCache().then(() => {
-    win.loadURL(DEV_URL, { extraHeaders: "pragma: no-cache\ncache-control: no-cache\n" });
+    win.loadURL(appUrl, { extraHeaders: "pragma: no-cache\ncache-control: no-cache\n" });
   });
   win.once("ready-to-show", () => win.show());
 
@@ -151,8 +211,17 @@ ipcMain.handle("dock:full", () => {
   setWindowState(getFullBounds(), { transparent: true });
 });
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   setAppMenu();
+  if (app.isPackaged) {
+    try {
+      appUrl = await startProductionServer();
+    } catch (err) {
+      console.error("Failed to start the bundled server:", err);
+      app.quit();
+      return;
+    }
+  }
   createWindow();
 });
 
@@ -162,4 +231,8 @@ app.on("window-all-closed", () => {
 
 app.on("activate", () => {
   if (BrowserWindow.getAllWindows().length === 0) createWindow();
+});
+
+app.on("before-quit", () => {
+  serverProcess?.kill();
 });

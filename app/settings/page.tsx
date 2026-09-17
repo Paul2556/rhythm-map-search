@@ -83,11 +83,27 @@ export default function SettingsPage() {
   const [libraryScanning, setLibraryScanning] = useState(false);
   const [libraryError, setLibraryError] = useState<string | null>(null);
   const [libraryNotice, setLibraryNotice] = useState<string | null>(null);
+  const [osuClientId, setOsuClientId] = useState("");
+  const [osuClientSecret, setOsuClientSecret] = useState("");
+  const [osuConfigured, setOsuConfigured] = useState(false);
+  const [osuSaving, setOsuSaving] = useState(false);
+  const [osuNotice, setOsuNotice] = useState<string | null>(null);
+  const [osuError, setOsuError] = useState<string | null>(null);
 
   useEffect(() => {
     const loaded = loadSettings();
     setSettings(loaded);
     setLibraryPathInput(loaded.quaverLibraryPath ?? "");
+  }, []);
+
+  useEffect(() => {
+    fetch("/api/settings/osu-credentials")
+      .then((res) => res.json())
+      .then((data) => {
+        setOsuConfigured(Boolean(data.configured));
+        setOsuClientId(data.clientId ?? "");
+      })
+      .catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -196,6 +212,59 @@ export default function SettingsPage() {
     }
   }
 
+  async function saveOsuCredentials() {
+    const clientId = osuClientId.trim();
+    const clientSecret = osuClientSecret.trim();
+    if (!clientId || !clientSecret) return;
+
+    setOsuSaving(true);
+    setOsuError(null);
+    setOsuNotice(null);
+
+    try {
+      const res = await fetch("/api/settings/osu-credentials", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ clientId, clientSecret }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Save failed.");
+
+      setOsuConfigured(Boolean(data.configured));
+      setOsuClientSecret("");
+      setOsuNotice("Saved. osu! search will use these credentials.");
+    } catch (err) {
+      setOsuError(err instanceof Error ? err.message : "Save failed.");
+    } finally {
+      setOsuSaving(false);
+    }
+  }
+
+  async function clearOsuCredentials() {
+    setOsuSaving(true);
+    setOsuError(null);
+    setOsuNotice(null);
+
+    try {
+      const res = await fetch("/api/settings/osu-credentials", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ clientId: "", clientSecret: "" }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Remove failed.");
+
+      setOsuConfigured(false);
+      setOsuClientId("");
+      setOsuClientSecret("");
+      setOsuNotice("Removed. osu! search is disabled until credentials are added again.");
+    } catch (err) {
+      setOsuError(err instanceof Error ? err.message : "Remove failed.");
+    } finally {
+      setOsuSaving(false);
+    }
+  }
+
   const { game } = settings;
 
   return (
@@ -216,6 +285,44 @@ export default function SettingsPage() {
           <option value="osu">osu!</option>
           <option value="quaver">Quaver</option>
         </select>
+      </Section>
+
+      <Section
+        title="osu! account"
+        description="osu! search needs your own OAuth app — create one at osu.ppy.sh/home/account/edit#oauth (any callback URL works) and paste the client id/secret below. Quaver search needs no setup."
+      >
+        <div className="flex flex-col gap-2 sm:flex-row">
+          <input
+            value={osuClientId}
+            onChange={(e) => setOsuClientId(e.target.value)}
+            placeholder="Client ID"
+            className="flex-1 rounded-md border border-white/15 bg-white/5 px-3 py-2 text-sm outline-none focus:border-white/40"
+          />
+          <input
+            value={osuClientSecret}
+            onChange={(e) => setOsuClientSecret(e.target.value)}
+            placeholder={osuConfigured ? "Client Secret (re-enter to update)" : "Client Secret"}
+            type="password"
+            className="flex-1 rounded-md border border-white/15 bg-white/5 px-3 py-2 text-sm outline-none focus:border-white/40"
+          />
+        </div>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={saveOsuCredentials}
+            disabled={osuSaving || !osuClientId.trim() || !osuClientSecret.trim()}
+            className="rounded-md bg-white px-4 py-2 text-sm font-medium text-black disabled:opacity-50"
+          >
+            {osuSaving ? "Saving…" : "Save"}
+          </button>
+          {osuConfigured && (
+            <button onClick={clearOsuCredentials} disabled={osuSaving} className="text-sm text-zinc-400 hover:text-white">
+              Remove
+            </button>
+          )}
+          <span className="text-xs text-zinc-500">{osuConfigured ? "Connected" : "Not connected"}</span>
+        </div>
+        {osuNotice && <p className="text-xs text-zinc-400">{osuNotice}</p>}
+        {osuError && <p className="text-xs text-red-400">{osuError}</p>}
       </Section>
 
       <Section title="Key bindings" description="Click a lane, then press the key you want to bind to it.">

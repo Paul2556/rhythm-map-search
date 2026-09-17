@@ -1,3 +1,4 @@
+import { getOsuCredentials } from "@/lib/serverConfig";
 import type { MapsetStatus, SourceSearchResult, UnifiedMapset } from "./types";
 
 const TOKEN_URL = "https://osu.ppy.sh/oauth/token";
@@ -14,12 +15,11 @@ interface OsuTokenCache {
 let tokenCache: OsuTokenCache | null = null;
 
 async function getAccessToken(): Promise<string> {
-  const clientId = process.env.OSU_CLIENT_ID;
-  const clientSecret = process.env.OSU_CLIENT_SECRET;
+  const { clientId, clientSecret } = getOsuCredentials();
 
   if (!clientId || !clientSecret) {
     throw new Error(
-      "Missing OSU_CLIENT_ID / OSU_CLIENT_SECRET. Create an OAuth app at https://osu.ppy.sh/home/account/edit#oauth and set them as env vars.",
+      "Missing osu! credentials. Create an OAuth app at https://osu.ppy.sh/home/account/edit#oauth and add the client id/secret in Settings.",
     );
   }
 

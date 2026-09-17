@@ -1,33 +1,47 @@
-A search UI over a small shared library (`lib/rhythm`) that queries the osu! and Quaver public APIs for 4-key (4K) mania mapsets and merges the results.
+# Rhythm Map Search
 
-## Getting Started
+A little desktop widget for 4-key (4K) mania: search osu! and Quaver mapsets from one place, browse maps you've already downloaded in Quaver, and play a practice mode with real charts and audio. It lives as a small floating icon docked in the corner of your screen — hover it to expand.
 
-Copy `.env.example` to `.env.local` and fill in an osu! OAuth client id/secret (create one at https://osu.ppy.sh/home/account/edit#oauth, any redirect URL works since only the `client_credentials` grant is used). Quaver's search endpoint is public and needs no credentials.
+## Download
+
+Grab the latest build for your OS from the [Releases page](https://github.com/Paul2556/rhythm-map-search/releases/latest).
+
+- **macOS**: download the `.dmg`, open it, and drag the app to Applications. The app isn't signed with an Apple Developer certificate, so Gatekeeper will call it "unidentified developer" the first time — right-click (or Control-click) the app and choose **Open** to bypass that once.
+- **Windows**: download the installer `.exe` and run it. SmartScreen may warn about an "unrecognized app" since it isn't signed — click **More info > Run anyway**.
+- **Linux**: download the `.AppImage`, `chmod +x` it, and run it.
+
+Once it's open, hover the small icon docked in the corner of your screen to expand it.
+
+### osu! search setup
+
+Quaver search works immediately with no setup. osu! search needs your own OAuth app, since that credential can't be safely bundled into a public app:
+
+1. Create one at [osu.ppy.sh/home/account/edit#oauth](https://osu.ppy.sh/home/account/edit#oauth) (any callback URL works — only the `client_credentials` grant is used).
+2. Open the app's Settings and paste the client ID/secret in under "osu! account".
+
+Credentials are stored locally on your machine and only ever sent to osu!'s API.
+
+## Development
+
+Use `nub` (not `npm`) for installing dependencies and running scripts — see `AGENTS.md`.
 
 ```bash
 nub install
 nub run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000) to see the search/maps/settings UI on its own. To run it as the actual floating desktop widget during development:
 
-Without osu! credentials configured, the osu! side of the search will show an error but Quaver results still work.
+```bash
+nub run dev:electron
+```
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Without osu! credentials configured (via `.env.local`, copied from `.env.example`, or the in-app Settings), osu! search shows an error but Quaver results still work.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Building an installer
 
-## Learn More
+```bash
+nub run dist
+```
 
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+This builds the production Next.js server, stages it for packaging, and runs `electron-builder` to produce an installer for your current OS in `dist/`. Pushing a `v*` tag (e.g. `git tag v0.1.0 && git push --tags`) runs the same thing on GitHub Actions for macOS, Windows, and Linux, and attaches the results to a GitHub Release automatically (see `.github/workflows/release.yml`).
