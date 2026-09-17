@@ -36,3 +36,14 @@ jobs:
       - run: pnpm exec electron-builder --publish always
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  publish:
+    needs: release
+    runs-on: ubuntu-latest
+    steps:
+      # electron-builder always creates the GitHub Release as a draft; once
+      # every platform above has uploaded its installer, flip it live so it
+      # shows up on the public Releases page without a manual step.
+      - run: gh release edit "${{ github.ref_name }}" --draft=false --repo "${{ github.repository }}"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
